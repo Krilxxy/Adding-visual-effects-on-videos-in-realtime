@@ -103,87 +103,109 @@ while True:
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = faceCascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=1)
-    
+    old_x = 0
+    old_y = 0
     for (x, y, w, h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
         roi_color = frame[y:y+h, x:x+w]
         eyes = eyeCascade.detectMultiScale(roi_gray)
-        centers.clear()
-        for (x_eye, y_eye, w_eye, h_eye) in eyes:
-            centers.append((x + int(x_eye + 0.3*w_eye),
-                            y + int(y_eye + 0.3*h_eye)))
-            
+        
+        if len(eyes) == 2:
+            centers.clear()
+        
+            for (x_eye, y_eye, w_eye, h_eye) in eyes:
+                centers.append((x + int(x_eye + 0.3*w_eye),
+                                y + int(y_eye + 0.3*h_eye)))
+        
             print('outside', type(centers))
-            if len(centers) > 1:  # if detect both eyes
-                h, w = foxFilter_img.shape[:2]
-                # extract the REGION OF INTEREST (ROI) from the image
-                eye_distance = abs(centers[1][0] - centers[0][0])
-                # overlay filter; the factor 2.12 is customizable depending
-                # on the size of the face
-                foxFilter_width = 2.4 * eye_distance
-                scaling_factor = foxFilter_width / w
-                print('inside if ',centers)
-                #print(scaling_factor, eye_distance, centers)
-                overlay_foxFilter = cv2.resize(
-                    foxFilter_img, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
-
-                x = centers[0][0] if centers[0][0] < centers[1][0] else centers[1][0]
+        if len(centers) == 2:  # if detect both eyes
             
-                # customizable X and Y locations; depends on the size of the face
-                x -= int(filterX * overlay_foxFilter.shape[1])  # 0.27
-                y += int(filterY * overlay_foxFilter.shape[0])  # 0.55
-                h, w = overlay_foxFilter.shape[:2]
-                h, w = int(h), int(w)
-                # if the value is negative, it changes the dtype to uint
-                x = max(x, 0)
-                y = max(y, 0)
-                h = max(h, 1)
-                w = max(w, 1)
+            h, w = foxFilter_img.shape[:2]
+            # extract the REGION OF INTEREST (ROI) from the image
+            eye_distance = abs(centers[1][0] - centers[0][0])
+            # overlay filter; the factor 2.12 is customizable depending
+            # on the size of the face
+            foxFilter_width = 2.4 * eye_distance
+            scaling_factor = foxFilter_width / w
+            print('inside if ',centers)
+            #print(scaling_factor, eye_distance, centers)
+            overlay_foxFilter = cv2.resize(
+                foxFilter_img, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
 
-              #  if h < 0:
-              #      h = h + 2**32
-              #  if w < 0:
-              #      w = w + 2**32
+            x = centers[0][0] if centers[0][0] < centers[1][0] else centers[1][0]
+        
+            # customizable X and Y locations; depends on the size of the face
+            x -= int(filterX * overlay_foxFilter.shape[1])  # 0.27
+            y += int(filterY * overlay_foxFilter.shape[0])  # 0.55
+            h, w = overlay_foxFilter.shape[:2]
+            h, w = int(h), int(w)
+            # if the value is negative, it changes the dtype to uint
+            x = max(x, 0)
+            y = max(y, 0)
+            h = max(h, 1)
+            w = max(w, 1)
 
-                frame_roi = frame[y:y+h, x:x+w]
-                # convert color image to graysacle and threshold it
-                gray_overlay_FoxFilter = cv2.cvtColor(overlay_foxFilter, cv2.COLOR_BGR2GRAY)
-                ret, mask = cv2.threshold(
-                    gray_overlay_FoxFilter, 160, 255, cv2.THRESH_BINARY_INV)
+            #  if h < 0:
+            #      h = h + 2**32
+            #  if w < 0:
+            #      w = w + 2**32
 
-                # create an inverse mask
-                mask_inv = cv2.bitwise_not(mask)
+            frame_roi = frame[y:y+h, x:x+w]
+            # convert color image to graysacle and threshold it
+            gray_overlay_FoxFilter = cv2.cvtColor(overlay_foxFilter, cv2.COLOR_BGR2GRAY)
+            ret, mask = cv2.threshold(
+                gray_overlay_FoxFilter, 160, 255, cv2.THRESH_BINARY_INV)
 
-                # resizing the masks
-                overlay_foxFilter = cv2.resize(
-                    foxFilter_img, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
+            # create an inverse mask
+            mask_inv = cv2.bitwise_not(mask)
 
-                mask = cv2.resize(orig_mask, None, fx=scaling_factor,
-                                  fy=scaling_factor, interpolation=cv2.INTER_AREA)
+            # resizing the masks
+            overlay_foxFilter = cv2.resize(
+                foxFilter_img, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
 
-                mask_inv = cv2.resize(
-                    orig_mask_inv, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
+            mask = cv2.resize(orig_mask, None, fx=scaling_factor,
+                                fy=scaling_factor, interpolation=cv2.INTER_AREA)
 
-                try:
-                    # use the mask to extract the face mask region of interest
-                    masked_face = cv2.bitwise_and(
-                        overlay_foxFilter, overlay_foxFilter, mask=mask)
-                    # use the inverse mask to get the remaining part of the image
-                    masked_frame = cv2.bitwise_and(
-                        frame_roi, frame_roi, mask=mask_inv)
-                except cv2.error as e:
-                    print('Ignoring arithmetic exceptions: ' + str(e))
-                    #raise e
+            mask_inv = cv2.resize(
+                orig_mask_inv, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
 
-                # add the two images to get the final output
-                frame[y:y+h, x:x+w] = cv2.add(masked_face, masked_frame)
+            try:
+                # use the mask to extract the face mask region of interest
+                masked_face = cv2.bitwise_and(
+                    overlay_foxFilter, overlay_foxFilter, mask=mask)
+                # use the inverse mask to get the remaining part of the image
+                masked_frame = cv2.bitwise_and(
+                    frame_roi, frame_roi, mask=mask_inv)
+            except cv2.error as e:
+                print('Ignoring arithmetic exceptions: ' + str(e))
+                #raise e
+            
+            x = min(x, frame.shape[1] - masked_frame.shape[1])
+            y = min(y, frame.shape[0] - masked_frame.shape[0])
+            
+            if x >= frame.shape[1] - masked_frame.shape[1]:
+                x = old_x
             else:
-                print("eyes not found")
+                old_x = x      
+            if y >= frame.shape[0] - masked_frame.shape[0]:
+                y = old_y
+            else:
+                old_y = y
             
-            cv2.imshow('Eye Detector', frame)
-            c = cv2.waitKey(1)
-            if c == 27:
-                break
+
+            print((frame[y:y+masked_face.shape[0], x:x+masked_face.shape[1]]).shape, frame.shape, x, y)
+            print(masked_face.shape)
+            print(masked_frame.shape)
+            # add the two images to get the final output
+            frame[old_y:old_y+masked_face.shape[0], old_x:old_x+masked_face.shape[1]] = cv2.add(masked_face, masked_frame)
+        else:
+            print("eyes not found", centers)
+            
+            
+        cv2.imshow('Eye Detector', frame)
+        c = cv2.waitKey(1)
+        if c == 27:
+            break
 
 cap.release()
 cv2.destroyAllWindows()
