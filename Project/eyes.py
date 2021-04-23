@@ -49,6 +49,9 @@ imgPathSun6 = '/sunglasses6.png'
 
 imgPathFinal = ''
 centers = []
+old_x = 0
+old_y = 0
+
 if usrInput == '1':
     imgPathFinal = imgPrefix + imgPathSun1
     filterX = 0.27
@@ -102,9 +105,8 @@ while True:
     vh, vw = int(vh), int(vw)
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = faceCascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=1)
-    old_x = 0
-    old_y = 0
+    faces = faceCascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=6)
+    
     for (x, y, w, h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
         roi_color = frame[y:y+h, x:x+w]
@@ -202,10 +204,10 @@ while True:
             print("eyes not found", centers)
             
             
-        cv2.imshow('Eye Detector', frame)
-        c = cv2.waitKey(1)
-        if c == 27:
-            break
+    cv2.imshow('Eye Detector', frame)
+    c = cv2.waitKey(1)
+    if c == 27:
+        break
 
 cap.release()
 cv2.destroyAllWindows()
